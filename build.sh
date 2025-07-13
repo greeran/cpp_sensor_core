@@ -132,6 +132,26 @@ fi
 MOSQUITTO_VERSION=$(pkg-config --modversion libmosquitto)
 print_status "libmosquitto version: $MOSQUITTO_VERSION"
 
+# Check for protobuf
+if ! pkg-config --exists protobuf; then
+    print_error "protobuf development libraries not found."
+    print_error "Please install libprotobuf-dev (Ubuntu/Debian) or protobuf-devel (CentOS/RHEL)"
+    exit 1
+fi
+
+PROTOBUF_VERSION=$(pkg-config --modversion protobuf)
+print_status "protobuf version: $PROTOBUF_VERSION"
+
+# Check for protoc compiler
+if ! command -v protoc &> /dev/null; then
+    print_error "protoc compiler not found."
+    print_error "Please install protobuf-compiler (Ubuntu/Debian) or protobuf-compiler (CentOS/RHEL)"
+    exit 1
+fi
+
+PROTOC_VERSION=$(protoc --version | awk '{print $2}')
+print_status "protoc version: $PROTOC_VERSION"
+
 # Clean build directory if requested
 if [[ "$CLEAN_BUILD" == true ]]; then
     print_status "Cleaning build directory: $BUILD_DIR"

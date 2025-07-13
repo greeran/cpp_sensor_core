@@ -8,7 +8,7 @@ A C++ application for the IMX8MP that simulates sensor data (CPU temperature, co
 - **Compass Heading Simulation**: Gradual heading changes with configurable variation
 - **GPS Position Simulation**: Position drift with realistic movement patterns
 - **MQTT Publishing**: Publishes sensor data to multiple MQTT topics
-- **JSON Format**: All data is published in structured JSON format
+- **Protocol Buffers**: All data is published in binary protobuf format for efficiency and type safety
 - **Configurable**: Command-line options for all simulation parameters
 - **Graceful Shutdown**: Proper signal handling and cleanup
 
@@ -22,48 +22,39 @@ The application publishes to the following MQTT topics:
 - `sensor/all` - Combined sensor data
 - `sensor/status` - Online/offline status (retained)
 
-## JSON Data Format
+## Protocol Buffers Data Format
 
-### Temperature Data
-```json
-{
-  "timestamp": "2024-01-15T10:30:45.123Z",
-  "temperature": 65.42,
-  "unit": "celsius"
+The application uses Protocol Buffers for efficient binary serialization. The schema is defined in `proto/sensor.proto`.
+
+### Message Types
+
+- **SensorData**: Combined sensor data with CPU temperature, compass heading, and GPS position
+- **TemperatureData**: Individual CPU temperature readings
+- **CompassData**: Individual compass heading readings  
+- **GpsPositionData**: Individual GPS position readings
+- **StatusMessage**: Device online/offline status
+
+### Schema Definition
+
+```protobuf
+syntax = "proto3";
+
+package sensor;
+
+message GpsData {
+  double latitude = 1;    // Decimal degrees
+  double longitude = 2;   // Decimal degrees
+  double altitude = 3;    // Meters above sea level
+  double accuracy = 4;    // Position accuracy in meters
 }
-```
 
-### Compass Data
-```json
-{
-  "timestamp": "2024-01-15T10:30:45.123Z",
-  "heading": 245.67,
-  "unit": "degrees"
-}
-```
-
-### GPS Data
-```json
-{
-  "timestamp": "2024-01-15T10:30:45.123Z",
-  "latitude": 37.774900,
-  "longitude": -122.419400,
-  "altitude": 100.50,
-  "unit": "decimal_degrees"
-}
-```
-
-### Combined Data
-```json
-{
-  "timestamp": "2024-01-15T10:30:45.123Z",
-  "cpu_temperature": 65.42,
-  "compass_heading": 245.67,
-  "gps": {
-    "latitude": 37.774900,
-    "longitude": -122.419400,
-    "altitude": 100.50
-  }
+message SensorData {
+  double cpu_temperature = 1;  // Celsius
+  double compass_heading = 2;  // Degrees (0-360)
+  GpsData gps = 3;            // GPS position
+  int64 timestamp = 4;        // Unix timestamp in milliseconds
+  string device_id = 5;       // Device identifier
+  string version = 6;         // Protocol version
 }
 ```
 
@@ -78,19 +69,20 @@ The application publishes to the following MQTT topics:
 - GCC 7+ or Clang 6+
 - CMake 3.16+
 - libmosquitto development libraries
+- Protocol Buffers development libraries
 
 ## Installation
 
 ### Ubuntu/Debian
 ```bash
 sudo apt update
-sudo apt install build-essential cmake libmosquitto-dev pkg-config
+sudo apt install build-essential cmake libmosquitto-dev libprotobuf-dev protobuf-compiler pkg-config
 ```
 
 ### CentOS/RHEL
 ```bash
 sudo yum groupinstall "Development Tools"
-sudo yum install cmake3 libmosquitto-devel pkg-config
+sudo yum install cmake3 libmosquitto-devel protobuf-devel protobuf-compiler pkg-config
 ```
 
 ## Building

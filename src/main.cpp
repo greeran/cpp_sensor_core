@@ -5,7 +5,7 @@
 #include <cstring>
 #include "sensor_simulator.h"
 #include "mqtt_client.h"
-#include "data_converter.h"
+#include "protobuf_converter.h"
 
 // Global variables for signal handling
 volatile bool running = true;
@@ -34,11 +34,12 @@ void printUsage(const char* program_name) {
               << "  -p, --password PASS         MQTT password\n"
               << "  -d, --client-id ID          MQTT client ID (default: sensor_simulator)\n"
               << "  -h, --help                  Show this help message\n"
-              << "\nMQTT Topics:\n"
-              << "  sensor/temperature           CPU temperature data\n"
-              << "  sensor/compass              Compass heading data\n"
-              << "  sensor/gps                  GPS position data\n"
-              << "  sensor/all                  All sensor data combined\n"
+              << "\nMQTT Topics (Protocol Buffers):\n"
+              << "  sensor/temperature           CPU temperature data (protobuf)\n"
+              << "  sensor/compass              Compass heading data (protobuf)\n"
+              << "  sensor/gps                  GPS position data (protobuf)\n"
+              << "  sensor/all                  All sensor data combined (protobuf)\n"
+              << "  sensor/status               Device status (protobuf)\n"
               << std::endl;
 }
 
@@ -127,15 +128,15 @@ int main(int argc, char* argv[]) {
         mqtt_client.setUsername(username);
         mqtt_client.setPassword(password);
     }
-    mqtt_client.setWill("sensor/status", "offline", 1);
+    mqtt_client.setWill("sensor/status", ProtobufConverter::createOfflineStatus(client_id), 1);
 
     // Set up MQTT callbacks
-    mqtt_client.setOnConnect([](int rc) {
+    mqtt_client.setOnConnect([client_id](int rc) {
         if (rc == 0) {
             std::cout << "Connected to MQTT broker successfully" << std::endl;
             // Publish online status
             if (g_mqtt_client) {
-                g_mqtt_client->publishRetained("sensor/status", "online", 1);
+                g_mqtt_client->publishRetained("sensor/status", ProtobufConverter::createOnlineStatus(client_id), 1);
             }
         }
     });
@@ -180,17 +181,17 @@ int main(int argc, char* argv[]) {
             // Generate sensor data
             SensorData data = simulator.generateSensorData();
 
-            // Convert to JSON and publish
-            std::string all_data_json = DataConverter::sensorDataToJson(data);
-            std::string temp_json = DataConverter::cpuTemperatureToJson(data);
-            std::string compass_json = DataConverter::compassToJson(data);
-            std::string gps_json = DataConverter::gpsToJson(data);
+            // Convert to protobuf and publish
+            std::string all_data_pb = ProtobufConverter::sensorDataToProtobuf(data, client_id);
+            std::string temp_pb = ProtobufConverter::temperatureToProtobuf(data, client_id);
+            std::string compass_pb = ProtobufConverter::compassToProtobuf(data, client_id);
+            std::string gps_pb = ProtobufConverter::gpsToProtobuf(data, client_id);
 
             // Publish to MQTT topics
-            mqtt_client.publish("sensor/all", all_data_json);
-            mqtt_client.publish("sensor/temperature", temp_json);
-            mqtt_client.publish("sensor/compass", compass_json);
-            mqtt_client.publish("sensor/gps", gps_json);
+            mqtt_client.publish("sensor/all", all_data_pb);
+            mqtt_client.publish("sensor/temperature", temp_pb);
+            mqtt_client.publish("sensor/compass", compass_pb);
+            mqtt_client.publish("sensor/gps", gps_pb);
 
             // Print status
             std::cout << "Published sensor data - "
@@ -210,7 +211,7 @@ int main(int argc, char* argv[]) {
 
     // Cleanup
     std::cout << "Shutting down..." << std::endl;
-    mqtt_client.publishRetained("sensor/status", "offline", 1);
+    mqtt_client.publishRetained("sensor/status", ProtobufConverter::createOfflineStatus(client_id), 1);
     mqtt_client.disconnect();
     mqtt_client.loopStop();
 
