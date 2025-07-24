@@ -6,6 +6,7 @@
 #include "sensor_simulator.h"
 #include "mqtt_client.h"
 #include "protobuf_converter.h"
+#include "actions.pb.h"
 
 // Global variables for signal handling
 volatile bool running = true;
@@ -130,6 +131,19 @@ int main(int argc, char* argv[]) {
     }
     mqtt_client.setWill("sensor/status", ProtobufConverter::createOfflineStatus(client_id), 1);
 
+    // Set up MQTT message handler
+    mqtt_client.setOnMessage([](const std::string& topic, const std::string& payload) {
+        actions::ActionRequest req;
+        actions::ActionAck ack;
+        if (req.ParseFromString(payload)) {
+            std::cout << "[MQTT] ActionRequest received on topic '" << topic << "': topic field='" << req.topic() << "'\n";
+        } else if (ack.ParseFromString(payload)) {
+            std::cout << "[MQTT] ActionAck received on topic '" << topic << "': ack field='" << ack.ack() << "'\n";
+        } else {
+            std::cout << "[MQTT] Received message on topic '" << topic << "' (unknown action message or parse error)\n";
+        }
+    });
+
     // Set up MQTT callbacks
     mqtt_client.setOnConnect([client_id](int rc) {
         if (rc == 0) {
@@ -137,6 +151,8 @@ int main(int argc, char* argv[]) {
             // Publish online status
             if (g_mqtt_client) {
                 g_mqtt_client->publishRetained("sensor/status", ProtobufConverter::createOnlineStatus(client_id), 1);
+                // Subscribe to all actions topics
+                g_mqtt_client->subscribe("action/#", 1);
             }
         }
     });

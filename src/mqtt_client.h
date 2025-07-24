@@ -19,6 +19,9 @@ public:
     bool publish(const std::string& topic, const std::string& message, int qos = 0);
     bool publishRetained(const std::string& topic, const std::string& message, int qos = 0);
 
+    // Subscribing
+    bool subscribe(const std::string& topic, int qos = 0);
+
     // Configuration
     void setClientId(const std::string& client_id);
     void setUsername(const std::string& username);
@@ -29,6 +32,8 @@ public:
     void setOnConnect(std::function<void(int)> callback);
     void setOnDisconnect(std::function<void(int)> callback);
     void setOnPublish(std::function<void(int)> callback);
+    // Message callback
+    void setOnMessage(std::function<void(const std::string&, const std::string&)> callback);
 
     // Loop management
     int loop(int timeout_ms = -1);
@@ -49,9 +54,12 @@ private:
     std::function<void(int)> on_connect_callback_;
     std::function<void(int)> on_disconnect_callback_;
     std::function<void(int)> on_publish_callback_;
+    // Message callback
+    std::function<void(const std::string&, const std::string&)> on_message_callback_;
 
     // Static callback functions for mosquitto
     static void onConnect(struct mosquitto* mosq, void* userdata, int rc);
     static void onDisconnect(struct mosquitto* mosq, void* userdata, int rc);
     static void onPublish(struct mosquitto* mosq, void* userdata, int mid);
+    static void onMessage(struct mosquitto* mosq, void* userdata, const struct mosquitto_message* message);
 }; 

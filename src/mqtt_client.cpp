@@ -105,6 +105,20 @@ bool MqttClient::publishRetained(const std::string& topic, const std::string& me
     return true;
 }
 
+bool MqttClient::subscribe(const std::string& topic, int qos) {
+    if (!mosq_ || !connected_) {
+        std::cerr << "Not connected to MQTT broker" << std::endl;
+        return false;
+    }
+    int rc = mosquitto_subscribe(mosq_, nullptr, topic.c_str(), qos);
+    if (rc != MOSQ_ERR_SUCCESS) {
+        std::cerr << "Failed to subscribe to topic: " << topic << ", error: " << mosquitto_strerror(rc) << std::endl;
+        return false;
+    }
+    std::cout << "Subscribed to topic: " << topic << std::endl;
+    return true;
+}
+
 void MqttClient::setClientId(const std::string& client_id) {
     client_id_ = client_id;
     if (mosq_) {
@@ -142,6 +156,13 @@ void MqttClient::setOnDisconnect(std::function<void(int)> callback) {
 
 void MqttClient::setOnPublish(std::function<void(int)> callback) {
     on_publish_callback_ = callback;
+}
+
+void MqttClient::setOnMessage(std::function<void(const std::string&, const std::string&)> callback) {
+    on_message_callback_ = callback;
+    if (mosq_) {
+        mosquitto_message_callback_set(mosq_, onMessage);
+    }
 }
 
 int MqttClient::loop(int timeout_ms) {
@@ -191,5 +212,17 @@ void MqttClient::onPublish(struct mosquitto* mosq, void* userdata, int mid) {
     
     if (client->on_publish_callback_) {
         client->on_publish_callback_(mid);
+    }
+} 
+
+void MqttClient::onMessage(struct mosquitto* mosq, void* userdata, const struct mosquitto_message* message) {
+    MqttClient* client = static_cast<MqttClient*>(userdata);
+    if (client && client->on_message_callback_ && message) {
+        std::string topic = message->topic ? message->topic : "";
+        std::string payload;
+        if (message->payload && message->payloadlen > 0) {
+            payload.assign(static_cast<const char*>(message->payload), message->payloadlen);
+        }
+        client->on_message_callback_(topic, payload);
     }
 } 

@@ -80,3 +80,7 @@ id_rsa.pub
 *~
 *.orig
 *.rej 
+
+# protobuf files
+*.pb.h
+*.pb.cc

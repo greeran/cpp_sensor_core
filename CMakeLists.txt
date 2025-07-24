@@ -14,7 +14,15 @@ include_directories(${MOSQUITTO_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 # Generate protobuf files
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS proto/sensor.proto)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS proto/sensor.proto proto/actions.proto proto/fileops.proto)
+
+# Set default build type to Debug if not specified
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Debug)
+endif()
+
+# Add debug flags for Debug builds
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
 
 # Add executable
 add_executable(sensor_simulator 
