@@ -7,10 +7,34 @@
 #include "mqtt_client.h"
 #include "protobuf_converter.h"
 #include "actions.pb.h"
+#include <map>
+#include <functional>
+#include "action_handler.h"
 
 // Global variables for signal handling
 volatile bool running = true;
 MqttClient* g_mqtt_client = nullptr;
+
+// Map for action handlers: topic -> handler function
+std::map<std::string, std::function<std::string(const std::string&)>> action_handlers;
+
+// Register an action handler
+void register_action_handler(const std::string& topic, std::function<std::string(const std::string&)> handler) {
+    action_handlers[topic] = handler;
+}
+
+// Example handler for 'reboot' action
+auto handle_action_reboot = [](const std::string& payload) -> std::string {
+    // Do something with payload
+    std::cout << "[Handler] Reboot action triggered with payload: " << payload << std::endl;
+    return "Rebooted successfully";
+};
+
+// Example handler for 'status' action
+auto handle_action_status = [](const std::string& payload) -> std::string {
+    std::cout << "[Handler] Status action triggered with payload: " << payload << std::endl;
+    return "Status: OK";
+};
 
 // Signal handler for graceful shutdown
 void signalHandler(int signum) {
@@ -131,14 +155,37 @@ int main(int argc, char* argv[]) {
     }
     mqtt_client.setWill("sensor/status", ProtobufConverter::createOfflineStatus(client_id), 1);
 
+    // Instantiate ActionHandler
+    ActionHandler action_handler;
+
+    // Register action handlers
+    action_handler.register_action_handler("reboot", handle_action_reboot);
+    action_handler.register_action_handler("status", handle_action_status);
+
     // Set up MQTT message handler
-    mqtt_client.setOnMessage([](const std::string& topic, const std::string& payload) {
+    mqtt_client.setOnMessage([&mqtt_client, &action_handler](const std::string& topic, const std::string& payload) {
         actions::ActionRequest req;
-        actions::ActionAck ack;
         if (req.ParseFromString(payload)) {
-            std::cout << "[MQTT] ActionRequest received on topic '" << topic << "': topic field='" << req.topic() << "'\n";
-        } else if (ack.ParseFromString(payload)) {
-            std::cout << "[MQTT] ActionAck received on topic '" << topic << "': ack field='" << ack.ack() << "'\n";
+            std::string action_topic = req.topic();
+            std::string ack_topic = req.ack_topic();
+            auto [found, result] = action_handler.run_handler(action_topic, req.payload());
+            if (found) {
+                std::cout << "[MQTT] ActionRequest handled for topic '" << action_topic << "', result: '" << result << "'\n";
+            } else {
+                std::cout << "[MQTT] No handler found for action topic '" << action_topic << "'\n";
+            }
+            if (!ack_topic.empty()) {
+                std::string ack_full_topic = "action/ack/" + ack_topic;
+                actions::ActionAck ack_msg;
+                ack_msg.set_ack(action_topic);
+                ack_msg.set_success(found);
+                ack_msg.set_error(found ? "" : "No handler found");
+                ack_msg.set_allocated_ack(new std::string(result));
+                std::string ack_payload;
+                ack_msg.SerializeToString(&ack_payload);
+                mqtt_client.publish(ack_full_topic, ack_payload, 1);
+                std::cout << "[MQTT] Published ack to '" << ack_full_topic << "'\n";
+            }
         } else {
             std::cout << "[MQTT] Received message on topic '" << topic << "' (unknown action message or parse error)\n";
         }
