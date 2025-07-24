@@ -33,6 +33,8 @@ auto handle_action_reboot = [](const std::string& payload) -> std::string {
 // Example handler for 'status' action
 auto handle_action_message = [](const std::string& payload) -> std::string {
     std::cout << "[Handler] Status action triggered with payload: " << payload << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::cout << "finished waiting" << std::endl;
     return "Status: OK";
 };
 
@@ -176,7 +178,7 @@ int main(int argc, char* argv[]) {
                 std::cout << "[MQTT] No handler found for action topic '" << action_topic << "'\n";
             }
             if (!ack_topic.empty()) {
-                std::string ack_full_topic = "action/ack/" + ack_topic;
+                //std::string ack_full_topic = "action/ack/" + ack_topic;
                 actions::ActionAck ack_msg;
                 ack_msg.set_ack(action_topic);
                 ack_msg.set_success(found);
@@ -184,8 +186,9 @@ int main(int argc, char* argv[]) {
                 ack_msg.set_allocated_ack(new std::string(result));
                 std::string ack_payload;
                 ack_msg.SerializeToString(&ack_payload);
-                mqtt_client.publish(ack_full_topic, ack_payload, 1);
-                std::cout << "[MQTT] Published ack to '" << ack_full_topic << "'\n";
+                //mqtt_client.publish(ack_full_topic, ack_payload, 1);
+                mqtt_client.publish(ack_topic, ack_payload, 1);
+                std::cout << "[MQTT] Published ack to '" << ack_topic << "'\n";
             }
         } else {
             std::cout << "[MQTT] Received message on topic '" << topic << "' (unknown action message or parse error)\n";
@@ -258,12 +261,12 @@ int main(int argc, char* argv[]) {
             mqtt_client.publish("sensor/gps", gps_pb);
 
             // Print status
-            std::cout << "Published sensor data - "
+            /*std::cout << "Published sensor data - "
                       << "CPU: " << data.cpu_temperature << "°C, "
                       << "Compass: " << data.compass_heading << "°, "
                       << "GPS: " << data.gps_latitude << "," << data.gps_longitude
                       << " (" << data.gps_altitude << "m)" << std::endl;
-
+            */
             // Wait for next update
             std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
 
