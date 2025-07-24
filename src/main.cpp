@@ -31,7 +31,7 @@ auto handle_action_reboot = [](const std::string& payload) -> std::string {
 };
 
 // Example handler for 'status' action
-auto handle_action_status = [](const std::string& payload) -> std::string {
+auto handle_action_message = [](const std::string& payload) -> std::string {
     std::cout << "[Handler] Status action triggered with payload: " << payload << std::endl;
     return "Status: OK";
 };
@@ -160,13 +160,14 @@ int main(int argc, char* argv[]) {
 
     // Register action handlers
     action_handler.register_action_handler("reboot", handle_action_reboot);
-    action_handler.register_action_handler("status", handle_action_status);
+    action_handler.register_action_handler("message", handle_action_message);
 
     // Set up MQTT message handler
     mqtt_client.setOnMessage([&mqtt_client, &action_handler](const std::string& topic, const std::string& payload) {
         actions::ActionRequest req;
         if (req.ParseFromString(payload)) {
-            std::string action_topic = req.topic();
+            std::string full_topic = req.topic();
+            std::string action_topic = full_topic.substr(full_topic.find_last_of('/') + 1);
             std::string ack_topic = req.ack_topic();
             auto [found, result] = action_handler.run_handler(action_topic, req.payload());
             if (found) {
